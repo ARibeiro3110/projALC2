@@ -7,4 +7,7 @@
 !public-test/*.ttp
 !public-test/*.out
 !public-test/Makefile
-
+!report/
+!report/*.tex
+!report/*.jpg
+!report/*.pdf
