@@ -8,7 +8,7 @@ from z3 import Optimize, Int, Or, And, sat
 ##### GLOBAL VARIABLES #####
 solver = Optimize()
 airport_to_city = {}            # key: airport, value: city
-cities_to_visit = []            # list of tuples (airport, k)
+cities_to_visit = []            # list of tuples (airport, k_m, k_M)
 flights = []                    # list of Flights (attributes: date, origin, destination, departure, arrival, cost)
 flights_with_origin = {}        # key: airport, value: flights[]
 flights_with_destination = {}   # key: airport, value: flights[]
@@ -22,15 +22,13 @@ class Date:
     def __init__(self, day, month):
         self.day = int(day)
         self.month = int(month)
+        self.ordinal = sum(self.days_in_month[:self.month - 1]) + self.day
 
     def __str__(self):
         return f"{self.day:02}/{self.month:02}"
 
-    def toOrdinal(self):
-        return sum(Date.days_in_month[:self.month - 1]) + self.day
-
     def nightsBetween(self, dt):
-        return dt.toOrdinal() - self.toOrdinal()
+        return dt.ordinal - self.ordinal
 
 class Flight:
     def __init__(self, date, origin, destination, departure, arrival, cost, var):
@@ -83,13 +81,13 @@ for i in range(m):
     flights_with_origin[flight.origin].append(flight)
     flights_with_destination[flight.destination].append(flight)
 
-solver.minimize(sum(flight.var * flight.cost for flight in flights))
+# solver.minimize(sum(flight.var * flight.cost for flight in flights))
 
 K = flights[0].date.nightsBetween(flights[-1].date) # TODO: needed?
 ##### end: HANDLE FLIGHTS #####
 
 
-##### FOR EACH CITY, ARRIVAL AND DEPARTURE ARE k NIGHTS APART #####
+##### FOR EACH CITY, ARRIVAL AND DEPARTURE ARE k_m to k_M NIGHTS APART #####
 for airport, k_m, k_M in cities_to_visit + [(base, K_m, K)]:
     if airport != base:
         arrivals = flights_with_destination[airport]
@@ -99,24 +97,24 @@ for airport, k_m, k_M in cities_to_visit + [(base, K_m, K)]:
         departures = flights_with_destination[airport]
 
     arrival_vars = [f.var for f in arrivals]
-    sum_arrivals = sum(arrival_vars)
-    solver.add(sum_arrivals == 1)
+    solver.add(sum(arrival_vars) == 1)
 
-    departure_vars = [f.var for f in departures]
-    sum_departures = sum(departure_vars)
-    solver.add(sum_departures == 1)
+    # departure_vars = [f.var for f in departures]
+    # solver.add(sum(departure_vars) == 1)
 
     for f_arrival in arrivals:
         compatible_departures = [f_departure.var for f_departure in departures
                                  if k_m <= f_arrival.date.nightsBetween(f_departure.date) <= k_M]
         sum_compatible_departures = sum(compatible_departures)
-        solver.add(Or(f_arrival.var == 0, sum_compatible_departures == 1))
-    
+        # solver.add(Or(f_arrival.var == 0, sum_compatible_departures == 1))
+        solver.add(f_arrival.var <= sum_compatible_departures)
+
     for f_departure in departures:
         compatible_arrivals = [f_arrival.var for f_arrival in arrivals
                                if k_m <= f_arrival.date.nightsBetween(f_departure.date) <= k_M]
         sum_compatible_arrivals = sum(compatible_arrivals)
-        solver.add(Or(f_departure.var == 0, sum_compatible_arrivals == 1))
+        # solver.add(Or(f_departure.var == 0, sum_compatible_arrivals == 1))
+        solver.add(f_departure.var <= sum_compatible_arrivals)
 ##### end: FOR EACH CITY, ARRIVAL AND DEPARTURE ARE k NIGHTS APART #####
 
 
