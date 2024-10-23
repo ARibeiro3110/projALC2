@@ -3,7 +3,7 @@
 # DO NOT remove or edit the lines above. Thank you.
 
 import sys
-from z3 import Optimize, sat, If, Bool, Sum, Int, Implies, And
+from z3 import Optimize, sat, If, Bool, Sum, Int, Implies, And, Or # TODO: remove unnecessary imports
 
 ##### GLOBAL VARIABLES #####
 solver = Optimize()
@@ -66,6 +66,7 @@ for i in range(2, n+1):
     airport_to_city[airport] = city
     flights_with_origin[airport] = []
     flights_with_destination[airport] = []
+    # cities_to_visit.append((airport, int(k_m), int(k_M)))
     cities_to_visit.append((airport, int(k_m), int(k_M), Int(f"k_{city}")))
 ##### end: HANDLE CITIES #####
 
@@ -89,6 +90,7 @@ solver.add(Sum([c[3] for c in cities_to_visit]) <= K)
 
 ##### FOR EACH CITY, ARRIVAL AND DEPARTURE ARE k_m to k_M NIGHTS APART #####
 for airport, k_m, k_M, k_c in cities_to_visit + [(base, K_m, K, None)]:
+# for airport, k_m, k_M in cities_to_visit + [(base, K_m, K)]:
     if airport != base:
         arrivals = flights_with_destination[airport]
         departures = flights_with_origin[airport]
@@ -96,11 +98,8 @@ for airport, k_m, k_M, k_c in cities_to_visit + [(base, K_m, K, None)]:
         arrivals = flights_with_origin[airport]
         departures = flights_with_destination[airport]
 
-    arrival_vars = [f.var for f in arrivals]
-    solver.add(Sum(arrival_vars) == 1)
-
-    # departure_vars = [f.var for f in departures]
-    # solver.add(Sum(departure_vars) == 1)
+    solver.add(Sum([f.var for f in arrivals]) == 1)
+    solver.add(Sum([f.var for f in departures]) == 1)
 
     for f_arrival in arrivals:
         compatible_departures = [f_departure for f_departure in departures
@@ -108,8 +107,9 @@ for airport, k_m, k_M, k_c in cities_to_visit + [(base, K_m, K, None)]:
         # if airport != base:
         #     for f_departure in compatible_departures:
         #         solver.add(Implies(And(f_arrival.var, f_departure.var), k_c == f_arrival.date.nightsBetween(f_departure.date)))
-        sum_compatible_departures = Sum([d.var for d in compatible_departures])
-        solver.add(If(f_arrival.var, 1, 0) <= sum_compatible_departures)
+        solver.add(Implies(f_arrival.var, Or([d.var for d in compatible_departures])))
+        # sum_compatible_departures = Sum([d.var for d in compatible_departures])
+        # solver.add(If(f_arrival.var, 1, 0) <= sum_compatible_departures)
 
     for f_departure in departures:
         compatible_arrivals = [f_arrival for f_arrival in arrivals
@@ -117,12 +117,14 @@ for airport, k_m, k_M, k_c in cities_to_visit + [(base, K_m, K, None)]:
         # if airport != base:
         #     for f_arrival in compatible_arrivals:
         #         solver.add(Implies(And(f_arrival.var, f_departure.var), k_c == f_arrival.date.nightsBetween(f_departure.date)))
-        sum_compatible_arrivals = Sum([a.var for a in compatible_arrivals])
-        solver.add(If(f_departure.var, 1, 0) <= sum_compatible_arrivals)
+        solver.add(Implies(f_departure.var, Or([a.var for a in compatible_arrivals])))
+        # sum_compatible_arrivals = Sum([a.var for a in compatible_arrivals])
+        # solver.add(If(f_departure.var, 1, 0) <= sum_compatible_arrivals)
 ##### end: FOR EACH CITY, ARRIVAL AND DEPARTURE ARE k NIGHTS APART #####
 
 
 ##### SOLVING #####
+print("Solving...", file=sys.stderr) # TODO:remove
 if solver.check() == sat:
     model = solver.model()
     selected_vars = [str(var) for var in model if model[var] == True]
