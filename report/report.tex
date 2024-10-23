@@ -1,0 +1,219 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{pdflscape}
+\usepackage{svg}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage[absolute,overlay]{textpos}
+\usepackage{lipsum}
+
+\newcommand{\reporttitle}{Projeto 2 -- Flying Tourist Problem}
+\newcommand{\authorname}{Afonso da Conceição Ribeiro}
+\newcommand{\authorid}{ist1102763}
+\newcommand{\authorgroup}{20}
+\newcommand{\reportauthor}{\textbf{\authorname} (\authorid) -- Grupo \textbf{\authorgroup}}
+\newcommand{\istul}{Instituto Superior Técnico -- Universidade de Lisboa}
+\newcommand{\reportcourse}{Algoritmos para Lógica Computacional}
+\newcommand{\reportyear}{2024/2025}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=blue,
+    citecolor=blue,
+    pdftitle={\reporttitle},
+    pdfpagemode=FullScreen,
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\reporttitle}
+\rhead{\reportcourse}
+\lfoot{\reportauthor}
+\rfoot{\thepage}
+
+
+\renewcommand{\footrulewidth}{0.2pt}
+
+\renewcommand\thesection{\arabic{section}.}
+\renewcommand\thesubsection{\thesection\arabic{subsection}.}
+\renewcommand\thesubsubsection{\thesubsection\arabic{subsubsection}.}
+
+\begin{document}
+    \begin{titlepage}
+
+        \begin{textblock*}{0cm}(10cm, 0cm)
+            \includegraphics[width=10cm]{Logo IST.jpg}
+        \end{textblock*}
+
+        \centering
+        \vspace*{5cm}
+        {\Huge \textbf{\reporttitle} \par}
+
+        \vspace{0.5cm}
+        {\LARGE \reportcourse \par}
+
+        \vspace{0.5cm}
+        {\large \reportyear \par}
+
+        \vspace{2cm}
+        {\large \reportauthor \par}
+        
+        \vspace{0.25cm}
+        {\large \istul \par}
+
+        \vfill
+        \renewcommand{\contentsname}{Índice}
+        \tableofcontents
+
+        \thispagestyle{empty}
+        \clearpage
+
+    \end{titlepage}
+
+
+    \setcounter{page}{2}
+    \setlength{\parskip}{0em}
+
+
+    \section{Problema a resolver}
+        O Flying Tourist Problem é um problema de otimização em que um turista precisa de planear uma viagem por várias cidades, minimizando o custo dos bilhetes de avião. Este inicia e termina a viagem na mesma cidade, e o número de noites que passa em cada cidade pertence a um intervalo definido para cada uma. A ordem das cidades a visitar não é predefinida, e o turista é obrigado a utilizar apenas voos diretos. O problema é modelado como um problema de Satisfiability Modulo Theories (SMT) e resolvido utilizando um solver correspondente.
+
+    \section{Como instalar e correr o projeto}
+        \begin{itemize}
+            \item Clonar o repositório do GitLab.
+            \item Navegar até à diretoria do projeto.
+            \item Correr o projeto utilizando o seguinte comando: \\
+                  \texttt{python3 project2.py < input.ttp > output.myout}
+            \item Comparar o conteúdo do ficheiro de output obtido com o output esperado.
+        \end{itemize}
+
+    \section{Codificações experimentadas para o problema}
+
+        A partir de um ficheiro de input que represente uma instância do problema, obtêm-se as seguintes variáveis e conjuntos:
+        \begin{itemize}
+            \item $\mathcal{C}$: conjunto das cidades que o turista pretende visitar e a cidade de origem; $n = \lvert \mathcal{C} \rvert$
+            \item $base$: a cidade de origem, $base \in \mathcal{C}$
+            \item $k_c^m$: número mínimo de noites a passar na cidade $c$,
+                  $\forall c \in \mathcal{C} \setminus \{base\}$
+            \item $k_c^M$: número máximo de noites a passar na cidade $c$,
+                  $\forall c \in \mathcal{C} \setminus \{base\}$
+            \item $\mathcal{F}$: conjunto dos voos em consideração; $m = \lvert \mathcal{F} \rvert$
+            \item $d_f$: data do voo $f$, $\forall f \in \mathcal{F}$
+            \item $w_f$: custo do voo $f$, $\forall f \in \mathcal{F}$
+        \end{itemize}
+        E definem-se as seguintes:
+        \begin{itemize}
+            \item $x_i = 1$ se e só se o voo $f_i$ é escolhido
+            \item $k_c$: número efetivo de noites a passar na cidade c,
+                  $\forall c \in \mathcal{C} \setminus \{base\}$
+            \item $K = d_{f_m} - d_{f_1}$: número de noites entre a primeira e a última datas com voos
+            \item $K_m = \sum_{c \in \mathcal{C}}{k_c^m}$: número mínimo de noites a viajar
+            \item $\mathcal{O}_c \subset \mathcal{F}$: conjunto dos voos com origem na cidade $c$, $\forall c \in \mathcal{C}$
+            \item $\mathcal{D}_c \subset \mathcal{F}$: conjunto dos voos com destino à cidade $c$, $\forall c \in \mathcal{C}$
+        \end{itemize}
+        Os conjutos de cláusulas utilizadas nas codificações do problema são descritos nas subsecções seguintes.
+
+    \subsection{Com filtragem de voos compatíveis}
+        Pretende-se minimizar o valor da seguinte expressão:
+        \begin{equation}
+            \sum_{i = 1}^m x_i \cdot w_i
+            \label{minimize_1}
+        \end{equation}
+        O primeiro conjunto de cláusulas, $\varphi_1$, garante que, para cada cidade, são escolhidos exatamente um voo com destino e um com origem na mesma.
+        \begin{equation}
+            \varphi_1 =
+            \bigwedge_{c \in \mathcal{C}}
+            \left(
+            \sum_{\substack{i = 1 \\
+                            f_i \in \mathcal{D}_c}}
+                ^{m}
+                {x_i} = 1
+            \land
+            \sum_{\substack{i = 1 \\
+                            f_i \in \mathcal{O}_c}}
+                ^{m}
+                {x_i} = 1
+            \right)
+            \label{exactly_one_per_c}
+        \end{equation}
+        O segundo conjunto de cláusulas assegura que, para cada cidade visitada, se um certo voo com destino nessa cidade é escolhido, então o voo com origem nessa cidade escolhido acontece entre $k_c^m$ e $k_c^M$ dias depois.
+        \begin{equation}
+            \varphi_2 =
+            \bigwedge_{c \in \mathcal{C} \setminus \{base\}}
+            \left(
+            \bigwedge_{\substack{i = 1 \\
+                                 f_i \in \mathcal{D}_c}}
+                     ^{m}
+            \left(
+            x_i \Rightarrow
+            \bigvee_{\substack{j = 1 \\
+                               f_j \in \mathcal{O}_c \\
+                               k_c^m \leq d_{f_j} - d_{f_i} \leq k_c^M}}
+                ^{m}
+                {x_j}
+            \right)
+            \right)
+            \label{k_nights}
+        \end{equation}
+        O terceiro conjunto de cláusulas é semelhante ao anterior, garantindo que, para cada cidade visitada, se um certo voo com origem nessa cidade é escolhido, então o voo com destino nessa cidade escolhido acontece entre $k_c^m$ e $k_c^M$ dias antes. Este conjunto de cláusulas é redundante, pois a sua semântica é já garantida por $\varphi_2$, mas a sua presença é relevante porque reduz o espaço de procura, aumentando a eficiência do programa.
+        \begin{equation}
+            \varphi_3 =
+            \bigwedge_{c \in \mathcal{C} \setminus \{base\}}
+            \left(
+            \bigwedge_{\substack{i = 1 \\
+                                 f_i \in \mathcal{O}_c}}
+                     ^{m}
+            \left(
+            x_i \Rightarrow
+            \bigvee_{\substack{j = 1 \\
+                               f_j \in \mathcal{D}_c \\
+                               k_c^m \leq d_{f_i} - d_{f_j} \leq k_c^M}}
+                ^{m}
+                {x_j}
+            \right)
+            \right)
+            \label{k_nights}
+        \end{equation}
+        No caso da cidade $base$, é o voo com destino na cidade que tem de acontecer depois do voo com origem, mais especificamente entre $K_m$ e $K$ dias depois. Isto é cumprido pelo seguinte conjunto de cláusulas, análogo aos últimos dois para a situação específica da cidade $base$.
+        \begin{equation}
+            \varphi_4 =
+            \bigwedge_{\substack{i = 1 \\
+                                 f_i \in \mathcal{O}_{base}}}
+                     ^{m}
+            \left(
+            x_i \Rightarrow
+            \bigvee_{\substack{j = 1 \\
+                               f_j \in \mathcal{D}_{base} \\
+                               K_m \leq d_{f_j} - d_{f_i} \leq K}}
+                ^{m}
+                {x_j}
+            \right)
+            \land
+            \bigwedge_{\substack{i = 1 \\
+                                 f_i \in \mathcal{D}_{base}}}
+                     ^{m}
+            \left(
+            x_i \Rightarrow
+            \bigvee_{\substack{j = 1 \\
+                               f_j \in \mathcal{O}_{base} \\
+                               K_m \leq d_{f_i} - d_{f_j} \leq K}}
+                ^{m}
+                {x_j}
+            \right)
+            \label{K_nights_base}
+        \end{equation}
+        Finalmente, a seguinte cláusula não afeta o espaço de procura, estando presente apenas com o objetivo de forçar o solver a resolver o problema utilizando a teoria de Aritmética Linear de Inteiros.
+        \begin{equation}
+            \varphi_5 =
+            \sum_{c \in \mathcal{C}}{k_c} \leq K
+            \label{minimize_1}
+        \end{equation}
+    
+    \subsection{Com variáveis para os dias de chegada e de partida de cada cidade}
+
+\end{document}
