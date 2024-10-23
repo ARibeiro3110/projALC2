@@ -3,7 +3,7 @@
 # DO NOT remove or edit the lines above. Thank you.
 
 import sys
-from z3 import Optimize, sat, If, Bool, Sum, Int, Implies, And, Or # TODO: remove unnecessary imports
+from z3 import Optimize, sat, If, Bool, Sum, Int, Implies, And, Or
 
 ##### GLOBAL VARIABLES #####
 solver = Optimize()

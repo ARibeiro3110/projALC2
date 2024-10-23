@@ -3,7 +3,7 @@
 # DO NOT remove or edit the lines above. Thank you.
 
 import sys
-from z3 import Optimize, sat, If, Bool, Sum, Int, Implies, And, Or # TODO: remove unnecessary imports
+from z3 import Optimize, sat, If, Bool, Sum, Int, Implies, Or
 
 ##### GLOBAL VARIABLES #####
 solver = Optimize()
@@ -83,7 +83,7 @@ for i in range(m):
 
 solver.minimize(Sum([If(flight.var, flight.cost, 0) for flight in flights]))
 
-K = flights[0].date.nightsBetween(flights[-1].date) # TODO: needed?
+K = flights[0].date.nightsBetween(flights[-1].date)
 solver.add(Sum([c[3] for c in cities_to_visit]) <= K)
 ##### end: HANDLE FLIGHTS #####
 
