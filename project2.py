@@ -15,24 +15,18 @@ flights_with_destination = {}   # key: airport, value: flights[]
 ##### end: GLOBAL VARIABLES #####
 
 
-##### CLASSES #####
-class Date:
-    days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-    def __init__(self, day, month):
-        self.day = int(day)
-        self.month = int(month)
-        self.ordinal = sum(self.days_in_month[:self.month - 1]) + self.day
-
-    def __str__(self):
-        return f"{self.day:02}/{self.month:02}"
-
-    def nightsBetween(self, dt):
-        return dt.ordinal - self.ordinal
+def date_to_string(d):
+    month = 1
+    while d > days_in_month[month - 1]:
+        d -= days_in_month[month - 1]
+        month += 1
+    return f"{d:02}/{month:02}"
 
 class Flight:
     def __init__(self, date, origin, destination, departure, arrival, cost, var):
-        self.date = Date(date[0:2], date[3:5])
+        self.date = sum(days_in_month[:int(date[3:5]) - 1]) + int(date[0:2])
         self.origin = origin
         self.destination = destination
         self.departure = departure
@@ -42,8 +36,9 @@ class Flight:
         self.var_name = f"x_{int(var)}"
 
     def __str__(self):
-        return f"{self.date} {airport_to_city[self.origin]} {airport_to_city[self.destination]} {self.departure} {self.cost}"
+        return f"{date_to_string(self.date)} {airport_to_city[self.origin]} {airport_to_city[self.destination]} {self.departure} {self.cost}"
 ##### end: CLASSES #####
+
 
 
 ##### READ FROM STDIN #####
@@ -67,7 +62,7 @@ for i in range(2, n+1):
     flights_with_origin[airport] = []
     flights_with_destination[airport] = []
     # cities_to_visit.append((airport, int(k_m), int(k_M)))
-    cities_to_visit.append((airport, int(k_m), int(k_M), Int(f"k_{city}")))
+    cities_to_visit.append((airport, int(k_m), int(k_M)))
 ##### end: HANDLE CITIES #####
 
 
@@ -82,45 +77,40 @@ for i in range(m):
     flights_with_destination[flight.destination].append(flight)
 
 solver.minimize(Sum([If(flight.var, flight.cost, 0) for flight in flights]))
-
-K = flights[0].date.nightsBetween(flights[-1].date) # TODO: needed?
-solver.add(Sum([c[3] for c in cities_to_visit]) <= K)
 ##### end: HANDLE FLIGHTS #####
 
 
-##### FOR EACH CITY, ARRIVAL AND DEPARTURE ARE k_m to k_M NIGHTS APART #####
-for airport, k_m, k_M, k_c in cities_to_visit + [(base, K_m, K, None)]:
-# for airport, k_m, k_M in cities_to_visit + [(base, K_m, K)]:
-    if airport != base:
-        arrivals = flights_with_destination[airport]
-        departures = flights_with_origin[airport]
-    else:
-        arrivals = flights_with_origin[airport]
-        departures = flights_with_destination[airport]
+##### CONSTRAINTS #####
+first_date = flights[0].date
+last_date = flights[-1].date
+K = last_date - first_date
 
-    solver.add(Sum([f.var for f in arrivals]) == 1)
-    solver.add(Sum([f.var for f in departures]) == 1)
+a_c = {}
+d_c = {}
+for city in airport_to_city:
+    a_c[city] = Int(f"a_{city}")
+    d_c[city] = Int(f"d_{city}")
+    solver.add(And(a_c[city] >= first_date, a_c[city] <= last_date))
+    solver.add(And(d_c[city] >= first_date, d_c[city] <= last_date))
+    solver.add(Sum([flight.var for flight in flights_with_destination[city]]) == 1)
+    solver.add(Sum([flight.var for flight in flights_with_origin[city]]) == 1)
 
-    for f_arrival in arrivals:
-        compatible_departures = [f_departure for f_departure in departures
-                                 if k_m <= f_arrival.date.nightsBetween(f_departure.date) <= k_M]
-        # if airport != base:
-        #     for f_departure in compatible_departures:
-        #         solver.add(Implies(And(f_arrival.var, f_departure.var), k_c == f_arrival.date.nightsBetween(f_departure.date)))
-        solver.add(Implies(f_arrival.var, Or([d.var for d in compatible_departures])))
-        # sum_compatible_departures = Sum([d.var for d in compatible_departures])
-        # solver.add(If(f_arrival.var, 1, 0) <= sum_compatible_departures)
+for flight in flights:
+    solver.add(Implies(flight.var, a_c[flight.destination] == flight.date))
+    solver.add(Implies(flight.var, d_c[flight.origin] == flight.date))
 
-    for f_departure in departures:
-        compatible_arrivals = [f_arrival for f_arrival in arrivals
-                               if k_m <= f_arrival.date.nightsBetween(f_departure.date) <= k_M]
-        # if airport != base:
-        #     for f_arrival in compatible_arrivals:
-        #         solver.add(Implies(And(f_arrival.var, f_departure.var), k_c == f_arrival.date.nightsBetween(f_departure.date)))
-        solver.add(Implies(f_departure.var, Or([a.var for a in compatible_arrivals])))
-        # sum_compatible_arrivals = Sum([a.var for a in compatible_arrivals])
-        # solver.add(If(f_departure.var, 1, 0) <= sum_compatible_arrivals)
-##### end: FOR EACH CITY, ARRIVAL AND DEPARTURE ARE k NIGHTS APART #####
+for city, k_m, k_M in cities_to_visit:
+    solver.add(k_m <= d_c[city] - a_c[city])
+    solver.add(d_c[city] - a_c[city] <= k_M)
+
+for city1, _, _ in cities_to_visit:
+    for city2, _, _ in cities_to_visit:
+        if city1 != city2:
+            solver.add(Or(d_c[city1] <= a_c[city2], d_c[city2] <= a_c[city1]))
+
+solver.add(Sum([If(d_c[base] == a_c[city], 1, 0) for city, _, _ in cities_to_visit]) == 1)
+solver.add(Sum([If(a_c[base] == d_c[city], 1, 0) for city, _, _ in cities_to_visit]) == 1)
+##### end: CONSTRAINTS #####
 
 
 ##### SOLVING #####
