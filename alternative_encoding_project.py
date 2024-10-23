@@ -102,10 +102,10 @@ for city, k_m, k_M in cities_to_visit:
     solver.add(k_m <= d_c[city] - a_c[city])
     solver.add(d_c[city] - a_c[city] <= k_M)
 
-# for city1, _, _ in cities_to_visit:
-#     for city2, _, _ in cities_to_visit:
-#         if city1 != city2:
-#             solver.add(Or(d_c[city1] <= a_c[city2], d_c[city2] <= a_c[city1]))
+for city1, _, _ in cities_to_visit:
+    for city2, _, _ in cities_to_visit:
+        if city1 != city2:
+            solver.add(Or(d_c[city1] <= a_c[city2], d_c[city2] <= a_c[city1]))
 
 solver.add(Sum([If(d_c[base] == a_c[city], 1, 0) for city, _, _ in cities_to_visit]) == 1)
 solver.add(Sum([If(a_c[base] == d_c[city], 1, 0) for city, _, _ in cities_to_visit]) == 1)
